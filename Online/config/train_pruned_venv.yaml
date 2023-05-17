@@ -1,0 +1,146 @@
+defaults:
+  - _self_
+
+agent_name: sac_venv
+#env: cheetah_run
+#env_type: dm_control
+
+#env: HalfCheetah-v2
+#env_type: gym
+
+# metaworld
+#env: door-open-v2
+#env_type: metaworld
+
+# env=door-unlock-v2 env_type=metaworld ips_threshold=0.1 mask_update_mavg=10
+
+# multitask envs
+env: MT10 #door-unlock-v2 #halfcheetah_forward
+env_type: metaworld #metaworld #multitask
+keep_ratio: 0.05
+lr: 0.001
+iterative_pruning: True
+continual_pruning: False #keep pruning all the way, if False: stop pruning after reaching some reward
+ips_threshold: 300 # iterative pruning stopping (ips) threshold; reward 2000
+mask_init_method: random # if 'expert', initialize mask with expert. if 'random' uses random sample
+mask_update_mavg: 10
+snip_itr: 1
+hidden_depth: 2
+num_tasks: 10
+grad_update_rule: 'pmean'
+optimization_type: adamW
+weight_decay: 0
+clip_grad: 0
+use_metadata: False
+
+# this needs to be specified manually
+experiment: test_exp
+
+num_train_steps: 1e6
+replay_buffer_capacity: 1e6
+
+# for pretrained-mask
+num_pretrain_steps: 10000
+pretrain_masks: False
+
+# for task encoder
+activate_task_encoder: False
+success_eval: 'v2' # v1 or v2
+
+num_seed_steps: 5000
+
+eval_frequency: 5000
+num_eval_episodes: 10
+
+device: cuda
+
+# logger
+log_frequency: 5000
+log_save_tb: true
+
+# video recorder
+save_video: false
+
+# network:
+hidden_dim: 1024
+batch_size: 1024
+
+seed: 0
+
+
+
+
+
+agent:
+  _target_: agent.sac_venv.SACAgent
+  obs_dim: ???
+  action_dim: ???
+  action_range: ???
+  device: ${device}
+  critic_cfg: ${double_q_critic}
+  actor_cfg: ${diag_gaussian_actor}
+  discount: 0.99
+  init_temperature: 0.1
+  alpha_lr:  ${lr}
+  alpha_betas: [0.9, 0.999]
+  actor_lr: ${lr}
+  actor_betas: [0.9, 0.999]
+  actor_update_frequency: 1 # 2 used in mtrl
+  critic_lr: ${lr}
+  critic_betas: [0.9, 0.999]
+  critic_tau: 0.005 # 0.01 used in mtrl
+  critic_target_update_frequency: 2
+  batch_size: ${batch_size}
+  learnable_temperature: True
+
+  ensemble_critic_cfg: ${ensembled_double_q_critic}
+  ensemble_actor_cfg: ${ensembled_diag_gaussian_actor}
+  num_tasks: ${num_tasks}
+  grad_update_rule: ${grad_update_rule}
+  keep_ratio: ${keep_ratio}
+  optimization_type: ${optimization_type}
+  weight_decay: ${weight_decay}
+
+
+
+
+double_q_critic:
+  _target_: agent.critic.DoubleQCritic
+  obs_dim: ${agent.obs_dim}
+  action_dim: ${agent.action_dim}
+  hidden_dim: ${hidden_dim}
+  hidden_depth: ${hidden_depth}
+
+diag_gaussian_actor:
+  _target_: agent.actor.DiagGaussianActor
+  obs_dim: ${agent.obs_dim}
+  action_dim: ${agent.action_dim}
+  hidden_dim: ${hidden_dim}
+  hidden_depth: ${hidden_depth}
+  log_std_bounds: [-10, 2] #[-20, 2]
+
+
+ensembled_diag_gaussian_actor:
+  _target_: agent.actor.EnsembledDiagGaussianActor
+  num_members: ${num_tasks}
+  obs_dim: ${agent.obs_dim}
+  action_dim: ${agent.action_dim}
+  hidden_dim: ${hidden_dim}
+  hidden_depth: ${hidden_depth}
+  log_std_bounds: [-10, 2] #[ -20, 2 ]
+
+ensembled_double_q_critic:
+  _target_: agent.critic.EnsembledDoubleQCritic
+  num_members: ${num_tasks}
+  obs_dim: ${agent.obs_dim}
+  action_dim: ${agent.action_dim}
+  hidden_dim: ${hidden_dim}
+  hidden_depth: ${hidden_depth}
+
+
+
+
+# hydra configuration
+hydra:
+  run:
+    dir: ./runs_pruned/

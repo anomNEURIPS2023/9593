@@ -1,0 +1,102 @@
+defaults:
+  - _self_
+
+agent_name: sac
+#env: cheetah_run
+#env_type: dm_control
+
+#env: HalfCheetah-v2
+#env_type: gym
+
+# metaworld
+env: door-open-v2
+env_type: metaworld
+
+# env=door-unlock-v2 env_type=metaworld ips_threshold=0.1 mask_update_mavg=10
+
+# multitask envs
+#env: halfcheetah_backward_jump #door-unlock-v2 #halfcheetah_forward
+#env_type: multitask #metaworld #multitask
+keep_ratio: 0.05
+lr: 0.001
+iterative_pruning: True
+continual_pruning: False #keep pruning all the way, if False: stop pruning after reaching some reward
+ips_threshold: 2000 #0.5 # iterative pruning stopping (ips) threshold; reward 2000
+mask_init_method: random # if 'expert', initialize mask with expert. if 'random' uses random sample
+mask_update_mavg: 10
+snip_itr: 1
+hidden_depth: 2
+
+# this needs to be specified manually
+experiment: test_exp
+
+num_train_steps: 1e6
+replay_buffer_capacity: 1e6
+
+num_seed_steps: 5000
+
+eval_frequency: 5000
+num_eval_episodes: 10
+
+device: cuda
+
+# logger
+log_frequency: 5000
+log_save_tb: true
+
+# video recorder
+save_video: false
+
+# network:
+hidden_dim: 1024
+batch_size: 1024
+
+seed: 0
+
+
+
+
+
+agent:
+  _target_: agent.sac.SACAgent
+  obs_dim: ???
+  action_dim: ???
+  action_range: ???
+  device: ${device}
+  critic_cfg: ${double_q_critic}
+  actor_cfg: ${diag_gaussian_actor}
+  discount: 0.99
+  init_temperature: 0.1
+  alpha_lr:  ${lr}
+  alpha_betas: [0.9, 0.999]
+  actor_lr: ${lr}
+  actor_betas: [0.9, 0.999]
+  actor_update_frequency: 1
+  critic_lr: ${lr}
+  critic_betas: [0.9, 0.999]
+  critic_tau: 0.005
+  critic_target_update_frequency: 2
+  batch_size: ${batch_size}
+  learnable_temperature: True
+
+
+
+double_q_critic:
+  _target_: agent.critic.DoubleQCritic
+  obs_dim: ${agent.obs_dim}
+  action_dim: ${agent.action_dim}
+  hidden_dim: ${hidden_dim}
+  hidden_depth: ${hidden_depth}
+
+diag_gaussian_actor:
+  _target_: agent.actor.DiagGaussianActor
+  obs_dim: ${agent.obs_dim}
+  action_dim: ${agent.action_dim}
+  hidden_dim: ${hidden_dim}
+  hidden_depth: ${hidden_depth}
+  log_std_bounds: [-10, 2]
+
+# hydra configuration
+hydra:
+  run:
+    dir: ./runs_pruned/
